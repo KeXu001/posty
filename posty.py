@@ -3,13 +3,14 @@ import requests
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
-
+import json
 
 class FilepathEntry(tk.Frame):
-  def __init__(self, parent, textvariable=None, *args, **kwargs):
+  def __init__(self, parent, textvariable=None, save_as=False, *args, **kwargs):
     super(FilepathEntry, self).__init__(parent)
 
     self.text_var = textvariable
+    self.save_as = save_as
 
     self.entry = tk.Entry(self, textvariable=self.text_var)
     self.entry.pack(expand=True, fill=tk.X, side=tk.LEFT)
@@ -18,7 +19,10 @@ class FilepathEntry(tk.Frame):
     self.button.pack(side=tk.RIGHT)
 
   def on_button_press(self):
-    selected = filedialog.askopenfilename()
+    if self.save_as:
+      selected = filedialog.asksaveasfilename()
+    else:
+      selected = filedialog.askopenfilename()
 
     if len(selected) > 0:
       if self.text_var is not None:
@@ -69,7 +73,8 @@ class Meta:
         'verify': tk.IntVar(),
         'ca_cert': tk.StringVar(),
         'client_cert': tk.StringVar(),
-        'client_key': tk.StringVar()
+        'client_key': tk.StringVar(),
+        'defaults_file': tk.StringVar()
       },
       'request': {
         'method': tk.StringVar(),
@@ -85,6 +90,17 @@ class Meta:
     }
 
     self.model['config']['verify'].set(1)
+
+    self.defaultable_keys = [
+      ('config', 'verify'),
+      ('config', 'ca_cert'),
+      ('config', 'client_cert'),
+      ('config', 'client_key'),
+      ('request', 'method'),
+      ('request', 'url'),
+      ('request', 'headers'),
+      ('request', 'body')
+    ]
 
   def go(self):
     method = self.model['request']['method'].get().upper()
@@ -145,6 +161,44 @@ class Meta:
     self.model['response']['headers'].set('\n'.join(k + ': ' + v for k,v in resp.headers.items()))
     self.model['response']['body'].set(resp.text)
 
+  def load_defaults(self):
+    defaults_file = self.model['config']['defaults_file'].get()
+    with open(defaults_file, 'r') as f:
+      obj = f.read()
+
+    defaults = json.loads(obj)
+
+    self.model['config']['verify'].set(defaults['config']['verify'])
+    self.model['config']['ca_cert'].set(defaults['config']['ca_cert'])
+    self.model['config']['client_cert'].set(defaults['config']['client_cert'])
+    self.model['config']['client_key'].set(defaults['config']['client_key'])
+    self.model['request']['method'].set(defaults['request']['method'])
+    self.model['request']['url'].set(defaults['request']['url'])
+    self.model['request']['headers'].set(defaults['request']['headers'])
+    self.model['request']['body'].set(defaults['request']['body'])
+
+  def save_defaults(self):
+    defaults = {
+      'config': {
+        'verify': self.model['config']['verify'].get(),
+        'ca_cert': self.model['config']['ca_cert'].get(),
+        'client_cert': self.model['config']['client_cert'].get(),
+        'client_key': self.model['config']['client_key'].get()
+      },
+      'request': {
+        'method': self.model['request']['method'].get(),
+        'url': self.model['request']['url'].get(),
+        'headers': self.model['request']['headers'].get(),
+        'body': self.model['request']['body'].get()
+      }
+    }
+
+    defaults_str = json.dumps(defaults)
+
+    defaults_file = self.model['config']['defaults_file'].get()
+    with open(defaults_file, 'w') as f:
+      f.write(defaults_str)
+
 class Posty:
 
   class TabView:
@@ -191,6 +245,18 @@ class Posty:
       self.add_item(0, 'Client Key',
         lambda parent: FilepathEntry(parent, textvariable=meta.model['config']['client_key']),
         sticky='ew')
+
+      self.add_item(0, 'Defaults File',
+        lambda parent: FilepathEntry(parent, textvariable=meta.model['config']['defaults_file'], save_as=True),
+        sticky='ew')
+
+      self.add_item(0, 'Load Defaults',
+        lambda parent: ttk.Button(parent, text='Load', command=meta.load_defaults),
+        sticky='w')
+
+      self.add_item(0, 'Save Defaults',
+        lambda parent: ttk.Button(parent, text='Save', command=meta.save_defaults),
+        sticky='w')
 
   class RequestTabView(TabView):
     def __init__(self, parent, meta):
