@@ -62,31 +62,37 @@ class ScrollableTextArea(tk.Frame):
     self.text_area.config(yscrollcommand=self.scrollbar.set)
     self.scrollbar.config(command=self.text_area.yview)
 
-class ViewModel:
+class Meta:
   def __init__(self):
-    self.config_verify = tk.IntVar()
-    self.config_verify.set(1)
-    self.config_ca_cert = tk.StringVar()
-    self.config_client_cert = tk.StringVar()
-    self.config_client_key = tk.StringVar()
+    self.model = {
+      'config': {
+        'verify': tk.IntVar(),
+        'ca_cert': tk.StringVar(),
+        'client_cert': tk.StringVar(),
+        'client_key': tk.StringVar()
+      },
+      'request': {
+        'method': tk.StringVar(),
+        'url': tk.StringVar(),
+        'headers': tk.StringVar(),
+        'body': tk.StringVar()
+      },
+      'response': {
+        'status': tk.StringVar(),
+        'headers': tk.StringVar(),
+        'body': tk.StringVar()
+      }
+    }
 
-    self.request_method = tk.StringVar()
-    self.request_method_options = ['GET', 'POST', 'PUT', 'DELETE']
-    self.request_url = tk.StringVar()
-    self.request_headers = tk.StringVar()
-    self.request_body = tk.StringVar()
-
-    self.response_status = tk.StringVar()
-    self.response_headers = tk.StringVar()
-    self.response_body=tk.StringVar()
+    self.model['config']['verify'].set(1)
 
   def go(self):
-    method = self.request_method.get().upper()
+    method = self.model['request']['method'].get().upper()
 
-    url = self.request_url.get()
+    url = self.model['request']['url'].get()
 
     headers = dict()
-    for line in self.request_headers.get().split('\n'):
+    for line in self.model['request']['headers'].get().split('\n'):
       if len(line) == 0:
         continue
 
@@ -99,13 +105,13 @@ class ViewModel:
       else:
         raise ValueError('Bad syntax for headers')
 
-    data = self.request_body.get()
+    data = self.model['request']['body'].get()
 
     prep_args = dict()
 
-    if self.config_verify.get():
-      if self.config_ca_cert.get():
-        prep_args['verify'] = self.config_ca_cert.get()
+    if self.model['config']['verify'].get():
+      if self.model['config']['ca_cert'].get():
+        prep_args['verify'] = self.model['config']['ca_cert'].get()
       else:
         prep_args['verify'] = True
 
@@ -114,8 +120,8 @@ class ViewModel:
     else:
       prep_args['verify'] = False
 
-    client_cert = self.config_client_cert.get()
-    client_key = self.config_client_key.get()
+    client_cert = self.model['config']['client_cert'].get()
+    client_key = self.model['config']['client_key'].get()
     if client_cert and client_key:
       prep_args['cert'] = (client_cert, client_key)
     elif client_cert and not client_key:
@@ -125,9 +131,9 @@ class ViewModel:
 
     # clear response
 
-    self.response_status.set('')
-    self.response_headers.set('')
-    self.response_body.set('')
+    self.model['response']['status'].set('')
+    self.model['response']['headers'].set('')
+    self.model['response']['body'].set('')
 
     sess = requests.Session()
     req = requests.Request(method=method, url=url, headers=headers, data=data)
@@ -135,10 +141,10 @@ class ViewModel:
 
     resp = sess.send(prepped, **prep_args)
 
-    self.response_status.set(str(resp.status_code))
-    self.response_headers.set('\n'.join(k + ': ' + v for k,v in resp.headers.items()))
-    self.response_body.set(resp.text)
-    
+    self.model['response']['status'].set(str(resp.status_code))
+    self.model['response']['headers'].set('\n'.join(k + ': ' + v for k,v in resp.headers.items()))
+    self.model['response']['body'].set(resp.text)
+
 class Posty:
 
   class TabView:
@@ -147,7 +153,7 @@ class Posty:
       'pady': 5
     }
 
-    def __init__(self, parent, view_model):
+    def __init__(self, parent):
       self.frame = tk.Frame(parent)
       self.frame.grid_columnconfigure(0, weight=0)
       self.frame.grid_columnconfigure(1, weight=1)
@@ -167,86 +173,86 @@ class Posty:
       self.row_count += 1
 
   class ConfigTabView(TabView):
-    def __init__(self, parent, view_model):
-      super(Posty.ConfigTabView, self).__init__(parent, view_model)
+    def __init__(self, parent, meta):
+      super(Posty.ConfigTabView, self).__init__(parent)
 
       self.add_item(0, 'Verify',
-        lambda parent: tk.Checkbutton(parent, variable=view_model.config_verify),
+        lambda parent: tk.Checkbutton(parent, variable=meta.model['config']['verify']),
         sticky='w')
 
       self.add_item(0, 'CA Cert',
-        lambda parent: FilepathEntry(parent, textvariable=view_model.config_ca_cert),
+        lambda parent: FilepathEntry(parent, textvariable=meta.model['config']['ca_cert']),
         sticky='ew')
 
       self.add_item(0, 'Client Cert',
-        lambda parent: FilepathEntry(parent, textvariable=view_model.config_client_cert),
+        lambda parent: FilepathEntry(parent, textvariable=meta.model['config']['client_cert']),
         sticky='ew')
 
       self.add_item(0, 'Client Key',
-        lambda parent: FilepathEntry(parent, textvariable=view_model.config_client_key),
+        lambda parent: FilepathEntry(parent, textvariable=meta.model['config']['client_key']),
         sticky='ew')
 
   class RequestTabView(TabView):
-    def __init__(self, parent, view_model):
-      super(Posty.RequestTabView, self).__init__(parent, view_model)
+    def __init__(self, parent, meta):
+      super(Posty.RequestTabView, self).__init__(parent)
 
       self.add_item(0, 'Method',
-        lambda parent: ttk.Combobox(parent, textvariable=view_model.request_method, values=view_model.request_method_options),
+        lambda parent: ttk.Combobox(parent, textvariable=meta.model['request']['method'], values=['GET','POST','PUT','DELETE']),
         sticky='w')
 
       self.add_item(0, 'URL',
-        lambda parent: tk.Entry(parent, textvariable=view_model.request_url),
+        lambda parent: tk.Entry(parent, textvariable=meta.model['request']['url']),
         sticky='ew')
 
       self.add_item(0, 'Headers',
-        lambda parent: ScrollableTextArea(parent, textvariable=view_model.request_headers, height=8, spacing1=8),
+        lambda parent: ScrollableTextArea(parent, textvariable=meta.model['request']['headers'], height=8, spacing1=8),
         sticky='nsew')
 
       self.add_item(0, 'Body',
-        lambda parent: ScrollableTextArea(parent, textvariable=view_model.request_body, height=8, spacing1=8),
+        lambda parent: ScrollableTextArea(parent, textvariable=meta.model['request']['body'], height=8, spacing1=8),
         sticky='nsew')
 
   class ResponseTabView(TabView):
-    def __init__(self, parent, view_model):
-      super(Posty.ResponseTabView, self).__init__(parent, view_model)
+    def __init__(self, parent, meta):
+      super(Posty.ResponseTabView, self).__init__(parent)
 
       self.add_item(0, 'Request',
-        lambda parent: ttk.Button(parent, text='Send', command=view_model.go),
+        lambda parent: ttk.Button(parent, text='Send', command=meta.go),
         sticky='w')
 
       self.add_item(0, 'Status',
-        lambda parent: tk.Entry(parent, textvariable=view_model.response_status),
+        lambda parent: tk.Entry(parent, textvariable=meta.model['response']['status']),
         sticky='ew')
 
       self.add_item(0, 'Headers',
-        lambda parent: ScrollableTextArea(parent, textvariable=view_model.response_headers, height=8, spacing1=8),
+        lambda parent: ScrollableTextArea(parent, textvariable=meta.model['response']['headers'], height=8, spacing1=8),
         sticky='nsew')
 
       self.add_item(0, 'Body',
-        lambda parent: ScrollableTextArea(parent, textvariable=view_model.response_body, height=8, spacing1=8),
+        lambda parent: ScrollableTextArea(parent, textvariable=meta.model['response']['body'], height=8, spacing1=8),
         sticky='nsew')
 
   class MainView:
-    def __init__(self, root, view_model):
+    def __init__(self, root, meta):
       self.notebook = ttk.Notebook(root)
       self.notebook.pack(expand=True, fill='both')
 
-      self.config_tab_view = Posty.ConfigTabView(self.notebook, view_model)
+      self.config_tab_view = Posty.ConfigTabView(self.notebook, meta)
       self.notebook.add(self.config_tab_view.frame, text='Config')
 
-      self.request_tab_view = Posty.RequestTabView(self.notebook, view_model)
+      self.request_tab_view = Posty.RequestTabView(self.notebook, meta)
       self.notebook.add(self.request_tab_view.frame, text='Request')
 
-      self.response_tab_view = Posty.ResponseTabView(self.notebook, view_model)
+      self.response_tab_view = Posty.ResponseTabView(self.notebook, meta)
       self.notebook.add(self.response_tab_view.frame, text='Response')
 
   def __init__(self):
     self.root = tk.Tk()
     self.root.title('Posty')
 
-    self.view_model = ViewModel()
+    self.meta = Meta()
 
-    self.view = Posty.MainView(self.root, self.view_model)
+    self.view = Posty.MainView(self.root, self.meta)
 
   def run(self):
     self.root.mainloop()
