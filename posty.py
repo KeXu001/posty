@@ -226,9 +226,9 @@ class Posty:
           continue
 
         parts = line.split(':')
-        if len(parts) == 2:
+        if len(parts) >= 2:
           key = parts[0].strip()
-          value = parts[1].strip()
+          value = ''.join(parts[1:]).strip()
 
           headers[key] = value
         else:
