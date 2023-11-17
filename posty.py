@@ -265,7 +265,7 @@ class Posty:
       self.model['response']['body'].set('')
 
       sess = requests.Session()
-      req = requests.Request(method=method, url=url, headers=headers, data=data)
+      req = requests.Request(method=method, url=url, headers=headers, data=data if data else None)
       prepped = sess.prepare_request(req)
 
       resp = sess.send(prepped, **prep_args)
